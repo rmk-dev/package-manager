@@ -17,7 +17,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Rmk\\PackageManagerTest\\": "./tests"
+            "Rmk\\PackageManagerTest\\": "./tests/PackageManagerTest"
         }
     },
     "license": "BSD 3-Clause",
