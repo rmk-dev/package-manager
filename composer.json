@@ -1,0 +1,30 @@
+{
+    "name": "rmk/package-manager",
+    "description": "Package manager for RMK applications",
+    "require": {
+        "php": "^7.4",
+        "rmk/service-container": "^1.0",
+        "rmk/callback-resolver": "^1.1",
+        "rmk/application": "^1.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Rmk\\PackageManager\\": "./src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Rmk\\PackageManagerTest\\": "./tests"
+        }
+    },
+    "license": "BSD 3-Clause",
+    "authors": [
+        {
+            "name": "Kiril Savchev",
+            "email": "k.savchev@gmail.com"
+        }
+    ]
+}
