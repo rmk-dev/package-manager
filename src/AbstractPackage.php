@@ -60,6 +60,13 @@ abstract class AbstractPackage implements
     protected array $eventListeners = [];
 
     /**
+     * List with routes
+     *
+     * @var array
+     */
+    protected array $routes;
+
+    /**
      * @return string
      */
     public function getVersion(): string
@@ -113,5 +120,13 @@ abstract class AbstractPackage implements
     public function getEventListeners(): array
     {
         return $this->eventListeners;
+    }
+
+    /**
+     * @return array
+     */
+    public function getRoutes(): array
+    {
+        return $this->routes;
     }
 }
