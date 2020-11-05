@@ -24,6 +24,10 @@
         <include>
             <directory suffix=".php">./src</directory>
         </include>
+        <exclude>
+            <directory>src/Events</directory>
+            <directory>src/Exceptions</directory>
+        </exclude>
         <report>
             <text outputFile="php://stdout" showUncoveredFiles="false"/>
         </report>
