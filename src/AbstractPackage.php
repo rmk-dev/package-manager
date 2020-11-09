@@ -69,7 +69,7 @@ abstract class AbstractPackage implements
      *
      * @var array
      */
-    protected array $routes;
+    protected array $routes = [];
 
     /**
      * @return string

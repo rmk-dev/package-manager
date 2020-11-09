@@ -5,16 +5,22 @@ namespace Rmk\PackageManager;
 use Composer\InstalledVersions;
 use Composer\Semver\Semver;
 use Composer\Semver\VersionParser;
+use Ds\Queue;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Rmk\Application\Event\ApplicationInitEvent;
 use Rmk\Container\ContainerInterface;
+use Rmk\Event\EventDispatcher;
 use Rmk\Event\EventDispatcherAwareInterface;
 use Rmk\Event\EventInterface;
+use Rmk\Event\ListenerProvider;
 use Rmk\Event\Traits\EventDispatcherAwareTrait;
 use Rmk\PackageManager\Events\BeforePackagesLoadEvent;
 use Rmk\PackageManager\Events\ComposerDependencyCheckEvent;
+use Rmk\PackageManager\Events\ConfigMergedEvent;
 use Rmk\PackageManager\Events\DependencyCheckEvent;
 use Rmk\PackageManager\Events\PackageEvent;
+use Rmk\PackageManager\Events\PackageLoadedEvent;
+use Rmk\PackageManager\Events\ServicesAddedEvent;
 use Rmk\PackageManager\Exception\ComposerPackageNotInstalledException;
 use Rmk\PackageManager\Exception\ComposerPackageVersionException;
 use Rmk\PackageManager\Exception\DependencyPackageNotExistsException;
@@ -23,6 +29,8 @@ use Rmk\PackageManager\Exception\InvalidPackageException;
 use Rmk\PackageManager\Exception\PackageDoesNotExistsException;
 use Rmk\PackageManager\Exception\PackageManagerException;
 use Rmk\ServiceContainer\ServiceContainer;
+use Rmk\ServiceContainer\ServiceContainerInterface;
+use Throwable;
 
 /**
  * Class PackageManager
@@ -61,10 +69,32 @@ class PackageManager implements EventDispatcherAwareInterface
     protected array $packageVersions = [];
 
     /**
+     * Version parser for composer packages
+     *
      * @var VersionParser
      */
     protected VersionParser $versionParser;
 
+    /**
+     * The application service container
+     *
+     * @var ServiceContainerInterface
+     */
+    protected ServiceContainerInterface $serviceContainer;
+
+    /**
+     * Merged configurations from all packages
+     *
+     * @var array
+     */
+    protected array $mergedConfig = [];
+
+    /**
+     * PackageManager constructor.
+     *
+     * @param EventDispatcherInterface $eventDispatcher
+     * @param ContainerInterface $packages
+     */
     public function __construct(EventDispatcherInterface $eventDispatcher, ContainerInterface $packages)
     {
         $this->setEventDispatcher($eventDispatcher);
@@ -72,9 +102,11 @@ class PackageManager implements EventDispatcherAwareInterface
     }
 
     /**
+     * The event handler
+     *
      * @param ApplicationInitEvent $event
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function onApplicationInit(ApplicationInitEvent $event): void
     {
@@ -85,12 +117,14 @@ class PackageManager implements EventDispatcherAwareInterface
     /**
      * Loads application packages
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function loadPackages(): void
     {
+        $this->serviceContainer = $this->applicationInitEvent->getServiceContainer();
         /** @var ContainerInterface $config */
-        $config = $this->applicationInitEvent->getServiceContainer()->get(ServiceContainer::CONFIG_KEY);
+        $config = $this->serviceContainer->get(ServiceContainer::CONFIG_KEY);
+        $this->mergedConfig = $config->toArray();
         if (!$config->has(self::PACKAGE_CONFIG_KEY)) {
             return;
         }
@@ -104,6 +138,7 @@ class PackageManager implements EventDispatcherAwareInterface
             $this->instantiatePackages($packageList);
             $this->versionParser = new VersionParser();
             $this->checkDependencies();
+            $this->initPackages();
         } catch (PackageManagerException $exception) {
             $this->applicationInitEvent->setParam('exception', $exception);
             $this->applicationInitEvent->stopPropagation($exception->getMessage());
@@ -139,7 +174,7 @@ class PackageManager implements EventDispatcherAwareInterface
      *
      * @return void
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     protected function checkDependencies(): void
     {
@@ -208,18 +243,120 @@ class PackageManager implements EventDispatcherAwareInterface
     }
 
     /**
+     * Initialize the packages
+     *
+     * @throws Throwable
+     */
+    protected function initPackages(): void
+    {
+        foreach ($this->packages as $package) {
+            /** @var PackageInterface $package */
+            $this->loadConfig($package);
+            $this->loadConfig($package);
+            $this->loadServices($package);
+            $this->loadEventListeners($package);
+            $this->loadRoutes($package);
+            $package->init($this->applicationInitEvent);
+            $this->dispatchPackageEvent(new PackageLoadedEvent($this, [
+                'package' => $package,
+                EventInterface::PARENT_EVENT => $this->applicationInitEvent
+            ]));
+        }
+    }
+
+    /**
+     * Loads package config and adds it to the merged one
+     *
+     * @param PackageInterface $package
+     * @throws Throwable
+     */
+    protected function loadConfig(PackageInterface $package): void
+    {
+        if ($package instanceof ConfigProviderInterface) {
+            $config = $package->getConfig();
+            $this->mergedConfig = array_replace_recursive($this->mergedConfig, $config);
+            $this->dispatchPackageEvent(new ConfigMergedEvent($this, [
+                'package' => $package,
+                'config' => $config,
+                'merged_config' => $this->mergedConfig,
+            ]));
+        }
+    }
+
+    /**
+     * Load services if any and adds them to the service container
+     *
+     * @param PackageInterface $package
+     * @throws Throwable
+     */
+    protected function loadServices(PackageInterface $package): void
+    {
+        if ($package instanceof ServiceProviderInterface) {
+            foreach ($package->getServices() as $serviceName => $service) {
+                $this->serviceContainer->add($service, $serviceName);
+            }
+            $this->dispatchPackageEvent(new ServicesAddedEvent($this, [
+                'package' => $package,
+                'services' => $this->serviceContainer->toArray(),
+            ]));
+        }
+    }
+
+    /**
+     * Loads event listeners
+     *
+     * @param PackageInterface $package
+     */
+    protected function loadEventListeners(PackageInterface $package): void
+    {
+        if ($package instanceof EventListenersProviderInterface) {
+            /** @var EventDispatcher $eventDispatcher */
+            $eventDispatcher = $this->getEventDispatcher();
+            if (!($eventDispatcher instanceof EventDispatcher)) {
+                return; // @codeCoverageIgnore
+            }
+            /** @var ListenerProvider $listenerProvider */
+            $listenerProvider = $eventDispatcher->getListenerProvider();
+            if (!($listenerProvider instanceof ListenerProvider)) {
+                return; // @codeCoverageIgnore
+            }
+            foreach ($package->getEventListeners() as $eventName => $listeners) {
+                foreach ($listeners as $listener) {
+                    // TODO Check for priorities!
+                    $listenerProvider->addEventListener($eventName, $listener);
+                }
+            }
+        }
+    }
+
+    /**
+     * Load routes
+     *
+     * @param PackageInterface $package
+     */
+    protected function loadRoutes(PackageInterface $package): void
+    {
+        if ($package instanceof RoutesProviderInterface) {
+            $router = $this->applicationInitEvent->getRouter();
+            foreach ($package->getRoutes() as $route) {
+                $router->getRouterAdapter()->add($route);
+            }
+        }
+    }
+
+    /**
      * Dispatch package event and checks whether it is stopped with exception
      *
      * @param PackageEvent $event
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     protected function dispatchPackageEvent(PackageEvent $event): void
     {
         $this->getEventDispatcher()->dispatch($event);
         if ($event->isPropagationStopped()) {
             $exception = $event->getParam('exception');
-            if ($exception && $exception instanceof \Throwable) {
+            if ($exception && $exception instanceof Throwable) {
                 throw $exception;
             }
         }

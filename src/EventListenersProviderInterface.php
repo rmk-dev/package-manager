@@ -7,7 +7,7 @@ namespace Rmk\PackageManager;
  *
  * @package Rmk\PackageManager
  */
-interface EventListenersProviderInterface
+interface EventListenersProviderInterface extends PackageInterface
 {
 
     public function getEventListeners(): array;

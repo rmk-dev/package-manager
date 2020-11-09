@@ -7,7 +7,8 @@
         "rmk/callback-resolver": "^1.1",
         "rmk/application": "^1.0",
         "composer/semver": "^3.2",
-        "composer-runtime-api": "^2.0"
+        "composer-runtime-api": "^2.0",
+        "rmk/container": "^1.0"
     },
     "require-dev": {
         "roave/security-advisories": "dev-master",

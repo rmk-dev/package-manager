@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "afa9bdf5d890f9d7daa35ccce5047f77",
+    "content-hash": "0db3bdbef1b036b7ee4bdfcc7b1e2a6e",
     "packages": [
         {
             "name": "altorouter/altorouter",
@@ -736,16 +736,16 @@
         },
         {
             "name": "rmk/container",
-            "version": "v1.0",
+            "version": "v1.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/rmk-dev/container.git",
-                "reference": "cf6a331d07be9469fc8ba4469d4b42c2d24bf9d7"
+                "reference": "a7eae33ecdedc4c312734c25e09a067daa321e97"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/rmk-dev/container/zipball/cf6a331d07be9469fc8ba4469d4b42c2d24bf9d7",
-                "reference": "cf6a331d07be9469fc8ba4469d4b42c2d24bf9d7",
+                "url": "https://api.github.com/repos/rmk-dev/container/zipball/a7eae33ecdedc4c312734c25e09a067daa321e97",
+                "reference": "a7eae33ecdedc4c312734c25e09a067daa321e97",
                 "shasum": ""
             },
             "require": {
@@ -774,9 +774,9 @@
             "description": "Simple PSR container implementation",
             "support": {
                 "issues": "https://github.com/rmk-dev/container/issues",
-                "source": "https://github.com/rmk-dev/container/tree/v1.0"
+                "source": "https://github.com/rmk-dev/container/tree/v1.1.0"
             },
-            "time": "2020-10-13T06:40:31+00:00"
+            "time": "2020-11-09T18:12:31+00:00"
         },
         {
             "name": "rmk/event-dispatcher",
@@ -1924,12 +1924,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/Roave/SecurityAdvisories.git",
-                "reference": "065a018d3b5c2c84a53db3347cca4e1b7fa362a6"
+                "reference": "e440567339d5fe93d9525e377c5e686b0b08bcca"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Roave/SecurityAdvisories/zipball/065a018d3b5c2c84a53db3347cca4e1b7fa362a6",
-                "reference": "065a018d3b5c2c84a53db3347cca4e1b7fa362a6",
+                "url": "https://api.github.com/repos/Roave/SecurityAdvisories/zipball/e440567339d5fe93d9525e377c5e686b0b08bcca",
+                "reference": "e440567339d5fe93d9525e377c5e686b0b08bcca",
                 "shasum": ""
             },
             "conflict": {
@@ -2231,7 +2231,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2020-11-01T20:01:47+00:00"
+            "time": "2020-11-07T16:07:08+00:00"
         },
         {
             "name": "sebastian/cli-parser",
