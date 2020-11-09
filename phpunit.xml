@@ -30,6 +30,7 @@
         </exclude>
         <report>
             <text outputFile="php://stdout" showUncoveredFiles="false"/>
+            <html outputDirectory="./data/" />
         </report>
     </coverage>
     <testsuites>

@@ -9,7 +9,6 @@ use Rmk\Application\Event\ApplicationInitEvent;
  * @package Rmk\PackageManager
  */
 abstract class AbstractPackage implements
-    PackageInterface,
     DependantPackageInterface,
     ConfigProviderInterface,
     ServiceProviderInterface,
@@ -23,6 +22,12 @@ abstract class AbstractPackage implements
      * @var string
      */
     protected string $version = 'v1.0.0';
+
+    /**
+     * The package name. It would be set automatically by the package manager
+     * @var string
+     */
+    protected string $name = '';
 
     /**
      * List of packages the current package depends on
@@ -128,5 +133,21 @@ abstract class AbstractPackage implements
     public function getRoutes(): array
     {
         return $this->routes;
+    }
+
+    /**
+     * @return string
+     */
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    /**
+     * @param string $name
+     */
+    public function setName(string $name): void
+    {
+        $this->name = $name;
     }
 }

@@ -14,5 +14,7 @@ interface PackageInterface
 
     public function getVersion(): string;
 
+    public function getName(): string;
+
     public function init(ApplicationInitEvent $event): void;
 }
