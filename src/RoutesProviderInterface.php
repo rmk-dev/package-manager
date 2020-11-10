@@ -7,7 +7,7 @@ namespace Rmk\PackageManager;
  *
  * @package Rmk\PackageManager
  */
-interface RoutesProviderInterface
+interface RoutesProviderInterface extends PackageInterface
 {
 
     public function getRoutes(): array;

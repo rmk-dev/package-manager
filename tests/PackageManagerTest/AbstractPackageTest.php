@@ -38,7 +38,9 @@ class AbstractPackageTest extends TestCase
                 ]
             ];
         };
+        $package->setName('Test\Package');
         $this->assertEquals('v1.1.0', $package->getVersion());
+        $this->assertEquals('Test\Package', $package->getName());
         $this->assertEquals(['Rmk\SomePackage' => '1.0'], $package->getDependencies());
         $this->assertEquals(['rmk/application' => '1.0'], $package->getComposerDependencies());
         $this->assertEquals(['some_key' => 'value1'], $package->getConfig());

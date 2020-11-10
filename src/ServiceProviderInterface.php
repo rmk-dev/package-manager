@@ -7,7 +7,7 @@ namespace Rmk\PackageManager;
  *
  * @package Rmk\PackageManager
  */
-interface ServiceProviderInterface
+interface ServiceProviderInterface extends PackageInterface
 {
 
     public function getServices(): array;

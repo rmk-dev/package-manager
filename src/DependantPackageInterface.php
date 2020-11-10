@@ -7,7 +7,7 @@ namespace Rmk\PackageManager;
  *
  * @package Rmk\PackageManager
  */
-interface DependantPackageInterface
+interface DependantPackageInterface extends PackageInterface
 {
 
     /**

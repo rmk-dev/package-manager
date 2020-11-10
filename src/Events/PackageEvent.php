@@ -4,6 +4,7 @@ namespace Rmk\PackageManager\Events;
 
 use Rmk\Event\EventInterface;
 use Rmk\Event\Traits\EventTrait;
+use Rmk\PackageManager\PackageManager;
 
 /**
  * Class PackageManagerEvent
@@ -16,12 +17,12 @@ abstract class PackageEvent implements EventInterface
     use EventTrait;
 
     /**
-     * @todo Add return type once the PackageManager is ready
+     * Returns the package manager
      *
      * @return mixed|null
      */
-    public function getPackageManager()
+    public function getPackageManager(): PackageManager
     {
-        return $this->getParam('package_manager');
+        return $this->getEmitter();
     }
 }
