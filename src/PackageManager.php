@@ -103,19 +103,6 @@ class PackageManager implements EventDispatcherAwareInterface
     }
 
     /**
-     * The event handler
-     *
-     * @param ApplicationInitEvent $event
-     *
-     * @throws Throwable
-     */
-    public function onApplicationInit(ApplicationInitEvent $event): void
-    {
-        $this->applicationInitEvent = $event;
-        $this->loadPackages();
-    }
-
-    /**
      * Loads application packages
      *
      * @throws Throwable
@@ -130,26 +117,20 @@ class PackageManager implements EventDispatcherAwareInterface
             return;
         }
         $packageList = $config->get(self::PACKAGE_CONFIG_KEY);
-        try {
-            $this->dispatchPackageEvent(new BeforePackagesLoadEvent($this, [
-                'config' => $config,
-                'package_list' => $packageList,
-                EventInterface::PARENT_EVENT => $this->applicationInitEvent,
-            ]));
-            $this->instantiatePackages($packageList);
-            $this->versionParser = new VersionParser();
-            $this->checkDependencies();
-            $this->initPackages();
-            $this->dispatchPackageEvent(new AfterPackagesLoadedEvent($this, [
-                'packages' => $this->packages,
-                EventInterface::PARENT_EVENT => $this->applicationInitEvent,
-            ]));
-        } catch (PackageManagerException $exception) {
-            if (!$this->applicationInitEvent->isPropagationStopped()) {
-                $this->applicationInitEvent->setParam('exception', $exception);
-                $this->applicationInitEvent->stopPropagation($exception->getMessage());
-            }
-        }
+        $this->dispatchPackageEvent(new BeforePackagesLoadEvent($this, [
+            'config' => $config,
+            'package_list' => $packageList,
+            EventInterface::PARENT_EVENT => $this->applicationInitEvent,
+        ]));
+        $this->instantiatePackages($packageList);
+        $this->versionParser = new VersionParser();
+        $this->checkDependencies();
+        $this->initPackages();
+        $this->dispatchPackageEvent(new AfterPackagesLoadedEvent($this, [
+            'packages' => $this->packages,
+            EventInterface::PARENT_EVENT => $this->applicationInitEvent,
+        ]));
+        $this->applicationInitEvent->setParam('package_manager', $this);
     }
 
     /**
@@ -387,5 +368,21 @@ class PackageManager implements EventDispatcherAwareInterface
     public function setPackages(ContainerInterface $packages): void
     {
         $this->packages = $packages;
+    }
+
+    /**
+     * @return ApplicationInitEvent
+     */
+    public function getApplicationInitEvent(): ApplicationInitEvent
+    {
+        return $this->applicationInitEvent;
+    }
+
+    /**
+     * @param ApplicationInitEvent $applicationInitEvent
+     */
+    public function setApplicationInitEvent(ApplicationInitEvent $applicationInitEvent): void
+    {
+        $this->applicationInitEvent = $applicationInitEvent;
     }
 }

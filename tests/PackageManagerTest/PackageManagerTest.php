@@ -224,78 +224,93 @@ namespace Rmk\PackageManagerTest {
             $this->eventDispatcher = new EventDispatcher(new ListenerProvider(new CallbackResolver($serviceContainer)));
             $this->packages = new Container();
             $this->packageManager = new PackageManager($this->eventDispatcher, $this->packages);
+            $this->packageManager->setApplicationInitEvent($this->applicationEvent);
         }
 
         public function testGetters(): void
         {
             $this->assertSame($this->packages, $this->packageManager->getPackages());
+            $this->assertSame($this->applicationEvent, $this->packageManager->getApplicationInitEvent());
         }
 
         public function testLoadPackages(): void
         {
-            $this->packageManager->onApplicationInit($this->applicationEvent);
+            $this->packageManager->loadPackages();
             $this->assertFalse($this->applicationEvent->isPropagationStopped());
         }
 
         public function testWithoutPackages(): void
         {
             $this->configHasPackages = false;
-            $this->packageManager->onApplicationInit($this->applicationEvent);
+            $this->packageManager->loadPackages();
             $this->assertFalse($this->applicationEvent->isPropagationStopped());
         }
 
         public function testNonExistingPackageClass(): void
         {
             $this->packageList[] = 'Test\NonExistingPackageClass';
-            $this->packageManager->onApplicationInit($this->applicationEvent);
-            $this->assertTrue($this->applicationEvent->isPropagationStopped());
-            $this->assertEquals('Test\NonExistingPackageClass does not exists', $this->applicationEvent->getStopReason());
-            $this->assertInstanceOf(PackageDoesNotExistsException::class, $this->applicationEvent->getParam('exception'));
+            $this->expectException(PackageDoesNotExistsException::class);
+            $this->expectExceptionMessage('Test\NonExistingPackageClass does not exists');
+            $this->packageManager->loadPackages();
+//            $this->assertTrue($this->applicationEvent->isPropagationStopped());
+//            $this->assertEquals('Test\NonExistingPackageClass does not exists', $this->applicationEvent->getStopReason());
+//            $this->assertInstanceOf(PackageDoesNotExistsException::class, $this->applicationEvent->getParam('exception'));
         }
 
         public function testInvalidPackageClass(): void
         {
             $this->packageList[] = 'Test\InvalidPackageClass';
-            $this->packageManager->onApplicationInit($this->applicationEvent);
-            $this->assertTrue($this->applicationEvent->isPropagationStopped());
-            $this->assertEquals('Test\InvalidPackageClass is not a valid package', $this->applicationEvent->getStopReason());
-            $this->assertInstanceOf(InvalidPackageException::class, $this->applicationEvent->getParam('exception'));
+            $this->expectException(InvalidPackageException::class);
+            $this->expectExceptionMessage('Test\InvalidPackageClass is not a valid package');
+            $this->packageManager->loadPackages();
+//            $this->assertTrue($this->applicationEvent->isPropagationStopped());
+//            $this->assertEquals('Test\InvalidPackageClass is not a valid package', $this->applicationEvent->getStopReason());
+//            $this->assertInstanceOf(InvalidPackageException::class, $this->applicationEvent->getParam('exception'));
         }
 
         public function testInvalidDependantPackageClass(): void
         {
             $this->packageList[] = 'Test\InvalidDependant';
-            $this->packageManager->onApplicationInit($this->applicationEvent);
-            $this->assertTrue($this->applicationEvent->isPropagationStopped());
-            $this->assertStringMatchesFormat('%s is required as dependency, but is not loaded', $this->applicationEvent->getStopReason());
-            $this->assertInstanceOf(DependencyPackageNotExistsException::class, $this->applicationEvent->getParam('exception'));
+            $this->expectException(DependencyPackageNotExistsException::class);
+            $this->expectExceptionMessageMatches('/ is required as dependency, but is not loaded$/');
+            $this->packageManager->loadPackages();
+//            $this->assertTrue($this->applicationEvent->isPropagationStopped());
+//            $this->assertStringMatchesFormat('%s is required as dependency, but is not loaded', $this->applicationEvent->getStopReason());
+//            $this->assertInstanceOf(DependencyPackageNotExistsException::class, $this->applicationEvent->getParam('exception'));
         }
 
         public function testInvalidDependantVersionPackageClass(): void
         {
             $this->packageList[] = 'Test\InvalidDependantVersion';
-            $this->packageManager->onApplicationInit($this->applicationEvent);
-            $this->assertTrue($this->applicationEvent->isPropagationStopped());
-            $this->assertStringMatchesFormat('%s is required in version constraint %s, version %s is installed', $this->applicationEvent->getStopReason());
-            $this->assertInstanceOf(DependencyVersionException::class, $this->applicationEvent->getParam('exception'));
+            $this->expectException(DependencyVersionException::class);
+            $this->expectExceptionMessageMatches('/is required in version constraint [\w\.\^\-]+, version [\w\.\^\-]+ is installed$/');
+            $this->packageManager->loadPackages();
+//            $this->assertTrue($this->applicationEvent->isPropagationStopped());
+//            $this->assertStringMatchesFormat('%s is required in version constraint %s, version %s is installed', $this->applicationEvent->getStopReason());
+//            $this->assertInstanceOf(DependencyVersionException::class, $this->applicationEvent->getParam('exception'));
         }
 
         public function testInvalidComposerDependantPackageClass(): void
         {
             $this->packageList[] = 'Test\InvalidComposerDependant';
-            $this->packageManager->onApplicationInit($this->applicationEvent);
-            $this->assertTrue($this->applicationEvent->isPropagationStopped());
-            $this->assertStringMatchesFormat('Composer package %s is required, but not installed. Try running \'composer require %s\'', $this->applicationEvent->getStopReason());
-            $this->assertInstanceOf(ComposerPackageNotInstalledException::class, $this->applicationEvent->getParam('exception'));
+            $this->expectException(ComposerPackageNotInstalledException::class);
+            $this->expectExceptionMessageMatches('/^Composer package [\w\-\.\/]+ is required, but not installed. Try running \'composer require [\w\-\.\/]+\'$/');
+            $this->packageManager->loadPackages();
+//            $this->assertTrue($this->applicationEvent->isPropagationStopped());
+//            $this->assertStringMatchesFormat('Composer package %s is required, but not installed. Try running \'composer require %s\'', $this->applicationEvent->getStopReason());
+//            $this->assertInstanceOf(ComposerPackageNotInstalledException::class, $this->applicationEvent->getParam('exception'));
         }
 
         public function testInvalidComposerDependantVersionPackageClass(): void
         {
             $this->packageList[] = 'Test\InvalidComposerVersion';
-            $this->packageManager->onApplicationInit($this->applicationEvent);
-            $this->assertTrue($this->applicationEvent->isPropagationStopped());
-            $this->assertStringMatchesFormat('Composer package %s in version %s is required, but version %s is installed', $this->applicationEvent->getStopReason());
-            $this->assertInstanceOf(ComposerPackageVersionException::class, $this->applicationEvent->getParam('exception'));
+            $this->expectException(ComposerPackageVersionException::class);
+            $this->expectExceptionMessageMatches('/^Composer package [\w\-\.\/]+ in version [\w\^\-\.\/]+ is required, but version [\w\^\-\.\/]+ is installed$/');
+            $this->packageManager->loadPackages();
+//            $this->assertTrue($this->applicationEvent->isPropagationStopped());
+//            $this->assertStringMatchesFormat('Composer package %s in version %s is required, but version %s is installed', $this->applicationEvent->getStopReason());
+//            $this->assertInstanceOf(ComposerPackageVersionException::class, $this->applicationEvent->getParam('exception'));
+
         }
 
         public function testStoppedEvent(): void
@@ -303,7 +318,7 @@ namespace Rmk\PackageManagerTest {
             $this->expectException(RuntimeException::class);
             $this->expectExceptionMessage('Test exception');
             $this->packageList[] = 'Test\EventListenerProvider';
-            $this->packageManager->onApplicationInit($this->applicationEvent);
+            $this->packageManager->loadPackages();
         }
     }
 }
