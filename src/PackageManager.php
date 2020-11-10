@@ -14,6 +14,7 @@ use Rmk\Event\EventDispatcherAwareInterface;
 use Rmk\Event\EventInterface;
 use Rmk\Event\ListenerProvider;
 use Rmk\Event\Traits\EventDispatcherAwareTrait;
+use Rmk\PackageManager\Events\AfterPackagesLoadedEvent;
 use Rmk\PackageManager\Events\BeforePackagesLoadEvent;
 use Rmk\PackageManager\Events\ComposerDependencyCheckEvent;
 use Rmk\PackageManager\Events\ConfigMergedEvent;
@@ -139,9 +140,15 @@ class PackageManager implements EventDispatcherAwareInterface
             $this->versionParser = new VersionParser();
             $this->checkDependencies();
             $this->initPackages();
+            $this->dispatchPackageEvent(new AfterPackagesLoadedEvent($this, [
+                'packages' => $this->packages,
+                EventInterface::PARENT_EVENT => $this->applicationInitEvent,
+            ]));
         } catch (PackageManagerException $exception) {
-            $this->applicationInitEvent->setParam('exception', $exception);
-            $this->applicationInitEvent->stopPropagation($exception->getMessage());
+            if (!$this->applicationInitEvent->isPropagationStopped()) {
+                $this->applicationInitEvent->setParam('exception', $exception);
+                $this->applicationInitEvent->stopPropagation($exception->getMessage());
+            }
         }
     }
 
@@ -186,6 +193,7 @@ class PackageManager implements EventDispatcherAwareInterface
                 $this->dispatchPackageEvent(new ComposerDependencyCheckEvent($this, [
                     'package' => $package,
                     'composer_dependencies' => $package->getComposerDependencies(),
+                    EventInterface::PARENT_EVENT => $this->applicationInitEvent
                 ]));
 
                 // Check whether the required application packages are installed
@@ -193,6 +201,7 @@ class PackageManager implements EventDispatcherAwareInterface
                 $this->dispatchPackageEvent(new DependencyCheckEvent($this, [
                     'package' => $package,
                     'dependencies' => $package->getDependencies(),
+                    EventInterface::PARENT_EVENT => $this->applicationInitEvent
                 ]));
             }
         }
@@ -279,6 +288,7 @@ class PackageManager implements EventDispatcherAwareInterface
                 'package' => $package,
                 'config' => $config,
                 'merged_config' => $this->mergedConfig,
+                EventInterface::PARENT_EVENT => $this->applicationInitEvent
             ]));
         }
     }
@@ -298,6 +308,7 @@ class PackageManager implements EventDispatcherAwareInterface
             $this->dispatchPackageEvent(new ServicesAddedEvent($this, [
                 'package' => $package,
                 'services' => $this->serviceContainer->toArray(),
+                EventInterface::PARENT_EVENT => $this->applicationInitEvent
             ]));
         }
     }
