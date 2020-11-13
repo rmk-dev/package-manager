@@ -114,6 +114,7 @@ class PackageManager implements EventDispatcherAwareInterface
         $this->instantiatePackages($packageList);
         $this->checkDependencies();
         $this->configurePackages();
+        $this->getApplicationInitEvent()->getServiceContainer()->init($this->packageConfigurator->getMergedConfig());
         $this->dispatchPackageEvent(new AfterPackagesLoadedEvent($this, [
             'packages' => $this->packages,
             EventInterface::PARENT_EVENT => $this->applicationInitEvent,
