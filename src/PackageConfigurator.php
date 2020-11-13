@@ -66,7 +66,6 @@ class PackageConfigurator implements EventDispatcherAwareInterface
     public function configure(PackageInterface $package): void
     {
         $this->loadConfig($package);
-        $this->loadConfig($package);
         $this->loadServices($package);
         $this->loadEventListeners($package);
         $this->loadRoutes($package);
@@ -140,15 +139,30 @@ class PackageConfigurator implements EventDispatcherAwareInterface
             }
             $eventListeners = $package->getEventListeners();
             foreach ($eventListeners as $eventName => $listeners) {
-                foreach ($listeners as $listener) {
-                    // TODO Check for priorities!
-                    $listenerProvider->addEventListener($eventName, $listener);
-                }
+                $this->configEventListeners($listenerProvider, $listeners, $eventName);
             }
             $this->dispatchPackageEvent(new EventListenersAddedEvent($this->packageManager, [
                 'package' => $package,
                 'event_listeners' => $eventListeners,
             ]));
+        }
+    }
+
+    protected function configEventListeners(ListenerProvider $listenerProvider, iterable $listeners, string $eventName): void
+    {
+        foreach ($listeners as $listener) {
+            $priority = 0;
+            if (is_array($listener)) {
+                if (count($listener) > 2) {
+                    $listener = array_slice($listener, 0, 3);
+                    $priority = (int) array_pop($listener);
+                }
+                if (!is_callable($listener)) {
+                    $priority = (int) array_pop($listener);
+                    $listener = array_pop($listener);
+                }
+            }
+            $listenerProvider->addEventListener($eventName, $listener, $priority);
         }
     }
 
