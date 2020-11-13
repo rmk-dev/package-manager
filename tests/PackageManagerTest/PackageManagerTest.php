@@ -118,6 +118,16 @@ namespace Test\EventListenerProvider {
     class Package extends AbstractPackage
     {
 
+        public function onPackageLoaded(PackageLoadedEvent $event)
+        {
+            $event->setParam('executed', 1);
+        }
+
+        public static function staticListener(PackageLoadedEvent $event)
+        {
+            $event->setParam('in_static_listener', 1);
+        }
+
         public function getEventListeners(): array
         {
             $this->eventListeners = [
@@ -127,7 +137,10 @@ namespace Test\EventListenerProvider {
                         $event->setParam('exception', $exception);
                         $event->stopPropagation($exception->getMessage());
                     },
-                ]
+                    [$this, 'onPackageLoaded', 10],
+                    [[$this, 'onPackageLoaded'], 10],
+                    [__CLASS__.'::staticListener', 5],
+                ],
             ];
             return parent::getEventListeners();
         }
