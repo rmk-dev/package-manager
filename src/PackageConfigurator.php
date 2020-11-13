@@ -2,6 +2,7 @@
 
 namespace Rmk\PackageManager;
 
+use Psr\EventDispatcher\ListenerProviderInterface;
 use Rmk\Application\Event\ApplicationInitEvent;
 use Rmk\Event\EventDispatcher;
 use Rmk\Event\EventDispatcherAwareInterface;
@@ -45,6 +46,8 @@ class PackageConfigurator implements EventDispatcherAwareInterface
      */
     protected PackageManager $packageManager;
 
+    protected ListenerProviderInterface $listenerProvider;
+
     /**
      * PackageConfigurator constructor.
      *
@@ -54,6 +57,12 @@ class PackageConfigurator implements EventDispatcherAwareInterface
     {
         $this->packageManager = $packageManager;
         $this->setEventDispatcher($packageManager->getEventDispatcher());
+        /** @var EventDispatcher $eventDispatcher */
+        $eventDispatcher = $this->getEventDispatcher();
+        if ($eventDispatcher instanceof EventDispatcher) {
+            /** @var ListenerProvider $listenerProvider */
+            $this->listenerProvider = $eventDispatcher->getListenerProvider();
+        }
     }
 
     /**
@@ -126,20 +135,13 @@ class PackageConfigurator implements EventDispatcherAwareInterface
      */
     protected function loadEventListeners(PackageInterface $package): void
     {
+        if (!($this->listenerProvider instanceof ListenerProvider)) {
+            return; // @codeCoverageIgnore
+        }
         if ($package instanceof EventListenersProviderInterface) {
-            /** @var EventDispatcher $eventDispatcher */
-            $eventDispatcher = $this->getEventDispatcher();
-            if (!($eventDispatcher instanceof EventDispatcher)) {
-                return; // @codeCoverageIgnore
-            }
-            /** @var ListenerProvider $listenerProvider */
-            $listenerProvider = $eventDispatcher->getListenerProvider();
-            if (!($listenerProvider instanceof ListenerProvider)) {
-                return; // @codeCoverageIgnore
-            }
             $eventListeners = $package->getEventListeners();
             foreach ($eventListeners as $eventName => $listeners) {
-                $this->configEventListeners($listenerProvider, $listeners, $eventName);
+                $this->configEventListeners($listeners, $eventName);
             }
             $this->dispatchPackageEvent(new EventListenersAddedEvent($this->packageManager, [
                 'package' => $package,
@@ -148,13 +150,13 @@ class PackageConfigurator implements EventDispatcherAwareInterface
         }
     }
 
-    protected function configEventListeners(ListenerProvider $listenerProvider, iterable $listeners, string $eventName): void
+    protected function configEventListeners(iterable $listeners, string $eventName): void
     {
         foreach ($listeners as $listener) {
             $priority = 0;
             if (is_array($listener)) {
+                $listener = array_slice($listener, 0, 3);
                 if (count($listener) > 2) {
-                    $listener = array_slice($listener, 0, 3);
                     $priority = (int) array_pop($listener);
                 }
                 if (!is_callable($listener)) {
@@ -162,7 +164,7 @@ class PackageConfigurator implements EventDispatcherAwareInterface
                     $listener = array_pop($listener);
                 }
             }
-            $listenerProvider->addEventListener($eventName, $listener, $priority);
+            $this->listenerProvider->addEventListener($eventName, $listener, $priority);
         }
     }
 
