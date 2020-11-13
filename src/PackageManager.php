@@ -139,7 +139,11 @@ class PackageManager implements EventDispatcherAwareInterface
      */
     public function getPackage(string $packageName): PackageInterface
     {
-        return $this->packages->get($packageName);
+        try {
+            return $this->packages->get($packageName);
+        } catch (Throwable $e) {
+            throw new PackageDoesNotExistsException($packageName.' does not exists', 1, $e);
+        }
     }
 
     /**
