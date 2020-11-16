@@ -2,10 +2,9 @@
 
 namespace Rmk\PackageManager;
 
-use Composer\InstalledVersions;
-use Composer\Semver\Semver;
-use Composer\Semver\VersionParser;
 use Psr\EventDispatcher\EventDispatcherInterface;
+use Psr\SimpleCache\CacheInterface;
+use Psr\SimpleCache\InvalidArgumentException;
 use Rmk\Application\Event\ApplicationInitEvent;
 use Rmk\Container\ContainerInterface;
 use Rmk\Event\EventDispatcherAwareInterface;
@@ -13,16 +12,10 @@ use Rmk\Event\EventInterface;
 use Rmk\Event\Traits\EventDispatcherAwareTrait;
 use Rmk\PackageManager\Events\AfterPackagesLoadedEvent;
 use Rmk\PackageManager\Events\BeforePackagesLoadEvent;
-use Rmk\PackageManager\Events\ComposerDependencyCheckEvent;
-use Rmk\PackageManager\Events\DependencyCheckEvent;
-use Rmk\PackageManager\Exception\ComposerPackageNotInstalledException;
-use Rmk\PackageManager\Exception\ComposerPackageVersionException;
-use Rmk\PackageManager\Exception\DependencyPackageNotExistsException;
-use Rmk\PackageManager\Exception\DependencyVersionException;
-use Rmk\PackageManager\Exception\InvalidPackageException;
+use Rmk\PackageManager\Exception\InvalidCacheKey;
 use Rmk\PackageManager\Exception\PackageDoesNotExistsException;
+use Rmk\ServiceContainer\Exception\ServiceNotFoundException;
 use Rmk\ServiceContainer\ServiceContainer;
-use Rmk\ServiceContainer\ServiceContainerInterface;
 use Throwable;
 
 /**
@@ -38,9 +31,24 @@ class PackageManager implements EventDispatcherAwareInterface
     use PackageEventDispatcherTrait;
 
     /**
+     * The name of the configuration about the package manager cache
+     */
+    public const PACKAGES_CACHE_CONFIG = 'packages_cache_config';
+
+    /**
+     * The key for the cached configuration
+     */
+    public const DEFAULT_CACHE_KEY = 'package_manager_config';
+
+    /**
      * The config key of package list
      */
     public const PACKAGE_CONFIG_KEY = 'packages';
+
+    /**
+     * Default living time for config cache in seconds - 1 hour
+     */
+    public const DEFAULT_CACHE_TTL = 3600;
 
     /**
      * The main application event the manager is attached to
@@ -64,19 +72,46 @@ class PackageManager implements EventDispatcherAwareInterface
     protected array $packageVersions = [];
 
     /**
+     * The object that configures packages
+     *
      * @var PackageConfigurator
      */
     protected PackageConfigurator $packageConfigurator;
 
     /**
+     * The object that creates packages
+     *
      * @var PackageInitiator
      */
     protected PackageInitiator $packageInitiator;
 
     /**
+     * Object that validates the package dependencies
+     *
      * @var PackageDependencyChecker
      */
     protected PackageDependencyChecker $packageDependencyChecker;
+
+    /**
+     * The cache adapter
+     *
+     * @var CacheInterface
+     */
+    protected CacheInterface $cache;
+
+    /**
+     * The key for cached config
+     *
+     * @var string
+     */
+    private string $cacheKey;
+
+    /**
+     * Time-to-live for the cached config
+     *
+     * @var int
+     */
+    private int $cacheTtl = 3600;
 
     /**
      * PackageManager constructor.
@@ -93,10 +128,13 @@ class PackageManager implements EventDispatcherAwareInterface
     /**
      * Loads application packages
      *
+     * @param ApplicationInitEvent $applicationInitEvent
+     *
      * @throws Throwable
      */
-    public function loadPackages(): void
+    public function loadPackages(ApplicationInitEvent $applicationInitEvent): void
     {
+        $this->setApplicationInitEvent($applicationInitEvent);
         $this->packageInitiator = new PackageInitiator($this);
         $this->packageDependencyChecker = new PackageDependencyChecker($this);
         $this->packageConfigurator = new PackageConfigurator($this);
@@ -113,6 +151,7 @@ class PackageManager implements EventDispatcherAwareInterface
         ]));
         $this->instantiatePackages($packageList);
         $this->checkDependencies();
+        $this->instantiateCache();
         $this->configurePackages();
         $this->getApplicationInitEvent()->getServiceContainer()->init($this->packageConfigurator->getMergedConfig());
         $this->dispatchPackageEvent(new AfterPackagesLoadedEvent($this, [
@@ -181,8 +220,40 @@ class PackageManager implements EventDispatcherAwareInterface
      */
     protected function configurePackages(): void
     {
-        foreach ($this->packages as $package) {
-            $this->packageConfigurator->configure($package);
+        try {
+            $cachedItem = $this->cache->get($this->cacheKey);
+            if (is_array($cachedItem)) {
+                $this->packageConfigurator->setMergedConfig($cachedItem);
+            } else {
+                foreach ($this->packages as $package) {
+                    $this->packageConfigurator->configure($package);
+                }
+                $this->cache->set($this->cacheKey, $this->packageConfigurator->getMergedConfig(), $this->cacheTtl);
+            }
+        } catch (InvalidArgumentException $e) {
+            $this->cacheKey = self::DEFAULT_CACHE_KEY;
+            $this->configurePackages();
+        }
+    }
+
+    /**
+     * Creates the cache adapter instance
+     */
+    protected function instantiateCache(): void
+    {
+        $serviceContainer = $this->getApplicationInitEvent()->getServiceContainer();
+        /** @var ContainerInterface $config */
+        $config = $serviceContainer->get(ServiceContainer::CONFIG_KEY);
+        $cacheConfig = [];
+        if ($config->has(self::PACKAGES_CACHE_CONFIG)) {
+            $cacheConfig = (array) $config->get(self::PACKAGES_CACHE_CONFIG);
+        }
+        $this->cacheKey = $cacheConfig['key'] ?? self::DEFAULT_CACHE_KEY;
+        $this->cacheTtl = $cacheConfig['ttl'] ?? self::DEFAULT_CACHE_TTL;
+        if (array_key_exists('adapter', $cacheConfig) && $serviceContainer->has($cacheConfig['adapter'])) {
+            $this->cache = $serviceContainer->get($cacheConfig['adapter']);
+        } else  {
+            $this->cache = new DefaultCacheAdapter();
         }
     }
 

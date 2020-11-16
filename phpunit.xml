@@ -27,6 +27,7 @@
         <exclude>
             <directory>src/Events</directory>
             <directory>src/Exceptions</directory>
+            <file>./src/DefaultCacheAdapter.php</file>
         </exclude>
         <report>
             <text outputFile="php://stdout" showUncoveredFiles="false"/>
