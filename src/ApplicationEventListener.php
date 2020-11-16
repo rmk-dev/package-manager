@@ -36,8 +36,7 @@ class ApplicationEventListener
     public function onApplicationInit(ApplicationInitEvent $event): void
     {
         try {
-            $this->packageManager->setApplicationInitEvent($event);
-            $this->packageManager->loadPackages();
+            $this->packageManager->loadPackages($event);
         } catch (PackageManagerException $exception) {
             if (!$event->isPropagationStopped()) {
                 $event->setParam('exception', $exception);

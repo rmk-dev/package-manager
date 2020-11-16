@@ -190,4 +190,12 @@ class PackageConfigurator implements EventDispatcherAwareInterface
     {
         return $this->mergedConfig;
     }
+
+    /**
+     * @param array $mergedConfig
+     */
+    public function setMergedConfig(array $mergedConfig): void
+    {
+        $this->mergedConfig = $mergedConfig;
+    }
 }

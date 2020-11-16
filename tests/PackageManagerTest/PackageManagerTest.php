@@ -152,6 +152,7 @@ namespace Rmk\PackageManagerTest {
     use PHPUnit\Framework\TestCase;
     use Psr\EventDispatcher\EventDispatcherInterface;
     use Psr\EventDispatcher\StoppableEventInterface;
+    use Psr\SimpleCache\CacheInterface;
     use Rmk\Application\Event\ApplicationInitEvent;
     use Rmk\Application\Factory\RouterServiceFactory;
     use Rmk\CallbackResolver\CallbackResolver;
@@ -159,6 +160,7 @@ namespace Rmk\PackageManagerTest {
     use Rmk\Container\ContainerInterface;
     use Rmk\Event\EventDispatcher;
     use Rmk\Event\ListenerProvider;
+    use Rmk\PackageManager\DefaultCacheAdapter;
     use Rmk\PackageManager\Events\PackageLoadedEvent;
     use Rmk\PackageManager\Exception\ComposerPackageNotInstalledException;
     use Rmk\PackageManager\Exception\ComposerPackageVersionException;
@@ -208,24 +210,38 @@ namespace Rmk\PackageManagerTest {
 
         private bool $configHasPackages = true;
 
+        private array $cacheConfig = [];
+
+        private CacheInterface $cache;
+
         protected function setUp(): void
         {
+            $this->cache = new DefaultCacheAdapter();
             $this->config = $this->getMockForAbstractClass(ContainerInterface::class);
             $this->config->method('has')->willReturnCallback(function($name) {
-                return $this->configHasPackages;
+                return $name === PackageManager::PACKAGES_CACHE_CONFIG || ($name === PackageManager::PACKAGE_CONFIG_KEY && $this->configHasPackages);
             });
             $this->config->method('get')->willReturnCallback(function ($name) {
                 if ($name === PackageManager::PACKAGE_CONFIG_KEY) {
                     return $this->packageList;
                 }
+                if ($name === PackageManager::PACKAGES_CACHE_CONFIG) {
+                    return $this->cacheConfig;
+                }
+
+                return null;
             });
             $serviceContainer = $this->getMockForAbstractClass(ServiceContainerInterface::class);
             $serviceContainer->method('has')->willReturnCallback(function ($name) {
-                return $name === ServiceContainer::CONFIG_KEY;
+                return $name === ServiceContainer::CONFIG_KEY || $name === 'PackageCacheAdapter';
             });
             $serviceContainer->method('get')->willReturnCallback(function ($name) {
                 if ($name === ServiceContainer::CONFIG_KEY) {
                     return $this->config;
+                }
+
+                if ($name === 'PackageCacheAdapter') {
+                    return $this->cache;
                 }
 
                 return null;
@@ -237,25 +253,23 @@ namespace Rmk\PackageManagerTest {
             $this->eventDispatcher = new EventDispatcher(new ListenerProvider(new CallbackResolver($serviceContainer)));
             $this->packages = new Container();
             $this->packageManager = new PackageManager($this->eventDispatcher, $this->packages);
-            $this->packageManager->setApplicationInitEvent($this->applicationEvent);
         }
 
         public function testGetters(): void
         {
             $this->assertSame($this->packages, $this->packageManager->getPackages());
-            $this->assertSame($this->applicationEvent, $this->packageManager->getApplicationInitEvent());
         }
 
         public function testLoadPackages(): void
         {
-            $this->packageManager->loadPackages();
+            $this->packageManager->loadPackages($this->applicationEvent);
             $this->assertFalse($this->applicationEvent->isPropagationStopped());
         }
 
         public function testWithoutPackages(): void
         {
             $this->configHasPackages = false;
-            $this->packageManager->loadPackages();
+            $this->packageManager->loadPackages($this->applicationEvent);
             $this->assertFalse($this->applicationEvent->isPropagationStopped());
         }
 
@@ -264,7 +278,7 @@ namespace Rmk\PackageManagerTest {
             $this->packageList[] = 'Test\NonExistingPackageClass';
             $this->expectException(PackageDoesNotExistsException::class);
             $this->expectExceptionMessage('Test\NonExistingPackageClass does not exists');
-            $this->packageManager->loadPackages();
+            $this->packageManager->loadPackages($this->applicationEvent);
         }
 
         public function testInvalidPackageClass(): void
@@ -272,7 +286,7 @@ namespace Rmk\PackageManagerTest {
             $this->packageList[] = 'Test\InvalidPackageClass';
             $this->expectException(InvalidPackageException::class);
             $this->expectExceptionMessage('Test\InvalidPackageClass is not a valid package');
-            $this->packageManager->loadPackages();
+            $this->packageManager->loadPackages($this->applicationEvent);
         }
 
         public function testInvalidDependantPackageClass(): void
@@ -280,7 +294,7 @@ namespace Rmk\PackageManagerTest {
             $this->packageList[] = 'Test\InvalidDependant';
             $this->expectException(DependencyPackageNotExistsException::class);
             $this->expectExceptionMessageMatches('/ is required as dependency, but is not loaded$/');
-            $this->packageManager->loadPackages();
+            $this->packageManager->loadPackages($this->applicationEvent);
         }
 
         public function testInvalidDependantVersionPackageClass(): void
@@ -288,7 +302,7 @@ namespace Rmk\PackageManagerTest {
             $this->packageList[] = 'Test\InvalidDependantVersion';
             $this->expectException(DependencyVersionException::class);
             $this->expectExceptionMessageMatches('/is required in version constraint [\w\.\^\-]+, version [\w\.\^\-]+ is installed$/');
-            $this->packageManager->loadPackages();
+            $this->packageManager->loadPackages($this->applicationEvent);
         }
 
         public function testInvalidComposerDependantPackageClass(): void
@@ -296,7 +310,7 @@ namespace Rmk\PackageManagerTest {
             $this->packageList[] = 'Test\InvalidComposerDependant';
             $this->expectException(ComposerPackageNotInstalledException::class);
             $this->expectExceptionMessageMatches('/^Composer package [\w\-\.\/]+ is required, but not installed. Try running \'composer require [\w\-\.\/]+\'$/');
-            $this->packageManager->loadPackages();
+            $this->packageManager->loadPackages($this->applicationEvent);
         }
 
         public function testInvalidComposerDependantVersionPackageClass(): void
@@ -304,7 +318,7 @@ namespace Rmk\PackageManagerTest {
             $this->packageList[] = 'Test\InvalidComposerVersion';
             $this->expectException(ComposerPackageVersionException::class);
             $this->expectExceptionMessageMatches('/^Composer package [\w\-\.\/]+ in version [\w\^\-\.\/]+ is required, but version [\w\^\-\.\/]+ is installed$/');
-            $this->packageManager->loadPackages();
+            $this->packageManager->loadPackages($this->applicationEvent);
 
         }
 
@@ -313,7 +327,7 @@ namespace Rmk\PackageManagerTest {
             $this->expectException(RuntimeException::class);
             $this->expectExceptionMessage('Test exception');
             $this->packageList[] = 'Test\EventListenerProvider';
-            $this->packageManager->loadPackages();
+            $this->packageManager->loadPackages($this->applicationEvent);
         }
 
         public function testPackageNotExists(): void
@@ -321,6 +335,41 @@ namespace Rmk\PackageManagerTest {
             $this->expectException(PackageDoesNotExistsException::class);
             $this->expectExceptionCode(1);
             $this->packageManager->getPackage('UnexistingPackage');
+        }
+
+        public function testCacheAdapter(): void
+        {
+            $this->cacheConfig = [
+                'adapter' => 'PackageCacheAdapter',
+                'key' => 'test_key',
+                'ttl' => 60,
+            ];
+            $this->packageManager->loadPackages($this->applicationEvent);
+            $this->assertFalse($this->applicationEvent->isPropagationStopped());
+        }
+
+        public function testCachedItem(): void
+        {
+            $this->cacheConfig = [
+                'adapter' => 'PackageCacheAdapter',
+                'key' => 'test_key',
+                'ttl' => 60,
+            ];
+            $this->cache->set('test_key', ['services' => ['key1' => 'value1']]);
+            $this->packageManager->loadPackages($this->applicationEvent);
+            $this->assertFalse($this->applicationEvent->isPropagationStopped());
+        }
+
+        public function testInvalidCachedKey(): void
+        {
+            $this->cacheConfig = [
+                'adapter' => 'PackageCacheAdapter',
+                'key' => 'test_key_({})',
+                'ttl' => 60,
+            ];
+            $this->cache->set('test_key', ['services' => ['key1' => 'value1']]);
+            $this->packageManager->loadPackages($this->applicationEvent);
+            $this->assertFalse($this->applicationEvent->isPropagationStopped());
         }
     }
 }
